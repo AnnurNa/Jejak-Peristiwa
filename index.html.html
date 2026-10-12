@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Susun Peristiwa Sirah Nabi - Edutainment MediaPipe</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- MediaPipe Hands CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            touch-action: none;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+        }
+        .card-drag {
+            transition: transform 0.2s ease, background-color 0.3s ease, border-color 0.3s ease;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col items-center justify-between overflow-x-hidden p-4">
+
+    <header class="w-full max-w-6xl flex flex-col md:flex-row items-center justify-between bg-slate-800/80 border border-slate-700 p-4 rounded-2xl shadow-xl mb-4 z-20">
+        <div class="flex items-center space-x-3 mb-2 md:mb-0">
+            <div class="bg-emerald-500 p-3 rounded-xl text-slate-950 font-bold text-xl shadow-lg">🕋</div>
+            <div>
+                <h1 class="text-xl md:text-2xl font-bold text-emerald-400">Susun Sirah Nabawiyyah</h1>
+                <p class="text-xs text-slate-400">Pendidikan Islam Tingkatan 1 | Kawalan Cubitan Tangan (MediaPipe)</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-4">
+            <div class="bg-slate-900 px-4 py-2 rounded-xl border border-slate-700 text-sm">
+                Skor: <span id="scoreVal" class="font-bold text-emerald-400">0</span> / 15
+            </div>
+            <button onclick="resetGame()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-semibold shadow-md transition">Semula</button>
+            <button onclick="toggleCamView()" id="camToggleBtn" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded-xl text-xs font-medium">Tutup Kamera</button>
+        </div>
+    </header>
+
+    <main class="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 mb-4 relative z-10">
+        
+        <!-- Left Column: Source Cards (Randomized) -->
+        <section class="lg:col-span-5 bg-slate-800/90 border border-slate-700 rounded-2xl p-4 flex flex-col shadow-2xl h-[520px]">
+            <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-3 flex items-center justify-between">
+                <span>Kad Pilihan Rawak</span>
+                <span class="text-xs bg-slate-700 px-2 py-0.5 rounded text-slate-400">Cubit untuk ambil</span>
+            </h2>
+            <div id="sourcePool" class="flex-1 overflow-y-auto space-y-3 pr-1 custom-scroll">
+                <!-- Dynamically populated cards -->
+            </div>
+        </section>
+
+        <!-- Center/Right Column: Target Timeline Slots & Webcam Overlay -->
+        <section class="lg:col-span-7 flex flex-col gap-4">
+            <!-- Timeline Slots Drop Area -->
+            <div class="bg-slate-800/90 border border-slate-700 rounded-2xl p-4 flex flex-col shadow-2xl h-[340px]">
+                <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-3 flex items-center justify-between">
+                    <span>Kotak Turutan Betul (1 hingga 15)</span>
+                    <span id="progressText" class="text-xs text-emerald-400 font-bold">0 / 15 Disusun</span>
+                </h2>
+                <div id="timelineSlots" class="flex-1 overflow-y-auto space-y-2.5 pr-1">
+                    <!-- Dynamically populated timeline slots -->
+                </div>
+            </div>
+
+            <!-- Webcam & Hand Tracker Box -->
+            <div class="relative bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl h-[170px] flex items-center justify-center">
+                <video id="webcam" class="absolute inset-0 w-full h-full object-cover -scale-x-100 opacity-60" autoplay playsinline muted></video>
+                <canvas id="output_canvas" class="absolute inset-0 w-full h-full object-cover pointer-events-none -scale-x-100"></canvas>
+                
+                <!-- Virtual Cursor Feedback -->
+                <div id="cursor" class="absolute w-8 h-8 rounded-full border-2 border-emerald-400 bg-emerald-500/30 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-30 transition-transform duration-75 flex items-center justify-center">
+                    <div id="cursorInner" class="w-2 h-2 bg-emerald-400 rounded-full"></div>
+                </div>
+
+                <div id="camStatus" class="absolute bottom-2 left-2 bg-slate-950/80 px-3 py-1 rounded-lg text-xs text-emerald-400 border border-slate-800 z-20 flex items-center space-x-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                    <span>MediaPipe Hands Aktif: Cubit (Ibu jari + Telunjuk) untuk seret kad</span>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="w-full max-w-6xl bg-slate-800/80 border border-slate-700 px-6 py-3 rounded-2xl text-center text-xs text-slate-400 flex flex-col sm:flex-row items-center justify-between">
+        <p>💡 Tip: Gunakan tetikus atau tunjuk dan cubit menggunakan jari anda di hadapan kamera untuk bermain.</p>
+        <button onclick="checkAnswers()" class="mt-2 sm:mt-0 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold px-6 py-2 rounded-xl shadow-lg transition transform hover:scale-105">Semak Jawapan</button>
+    </footer>
+
+    <!-- Custom Feedback Modal -->
+    <div id="modalOverlay" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-3xl p-6 max-w-md w-full text-center shadow-2xl animate-bounce-in">
+            <div id="modalIcon" class="text-5xl mb-3">🎉</div>
+            <h3 id="modalTitle" class="text-xl font-bold text-white mb-2">Tahniah!</h3>
+            <p id="modalDesc" class="text-slate-300 text-sm mb-6">Semua susunan peristiwa sirah nabi adalah tepat.</p>
+            <button onclick="closeModal()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2.5 rounded-xl transition">Teruskan</button>
+        </div>
+    </div>
+
+    <script>
+        // Database of Events based on Artifact State
+        const eventsData = [
+            { id: 0, text: "Kelahiran Nabi Muhammad SAW (12 Rabiulawal / 20 April 570M)" },
+            { id: 1, text: "Wafatnya Ayahanda Baginda (Abdullah bin Abdul Mutalib)" },
+            { id: 2, text: "Penyusuan oleh Halimah al-Sa'diah di Bani Saad" },
+            { id: 3, text: "Peristiwa Pembelahan Dada Rasulullah SAW oleh Malaikat Jibril" },
+            { id: 4, text: "Wafatnya Ibunda Baginda (Siti Aminah) di Abwa'" },
+            { id: 5, text: "Peliharaan Datuk Baginda (Abdul Mutalib) selama 2 tahun" },
+            { id: 6, text: "Peliharaan Bapa Saudara Baginda (Abu Talib) hingga dewasa" },
+            { id: 7, text: "Mengembala Kambing di sekitar Makkah" },
+            { id: 8, text: "Musafir Pertama ke Syam bersama Abu Talib (Umur 12 tahun)" },
+            { id: 9, text: "Terlibat dalam Perang al-Fijar (Umur 14-15 tahun)" },
+            { id: 10, text: "Menyaksikan Perjanjian Hilf al-Fudul membela yang dizalimi" },
+            { id: 11, text: "Menguruskan Perniagaan Saidatina Khadijah ke Syam bersama Maisarah" },
+            { id: 12, text: "Pernikahan dengan Saidatina Khadijah binti Khuwailid" },
+            { id: 13, text: "Peristiwa Meletakkan Semula Hajar Aswad dengan bijaksana" },
+            { id: 14, text: "Menerima Wahyu Pertama (Nubuwwah) di Gua Hira' (Umur 40 tahun)" }
+        ];
+
+        let gameState = {
+            sourcePool: [],
+            slots: Array(15).fill(null),
+            activeDraggingCard: null,
+            dragOffset: { x: 0, y: 0 }
+        };
+
+        // Web Audio API Sound Synthesizer (No external audio assets needed)
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            if (type === 'success') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
+                osc.frequency.exponentialRampToValueAtTime(659.25, audioCtx.currentTime + 0.1); // E5
+                osc.frequency.exponentialRampToValueAtTime(783.99, audioCtx.currentTime + 0.2); // G5
+                gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.4);
+            } else if (type === 'error') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+                osc.frequency.linearRampToValueAtTime(120, audioCtx.currentTime + 0.25);
+                gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.25);
+            } else if (type === 'snap') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.08);
+            }
+        }
+
+        // Initialize Game Board
+        function initGame() {
+            // Shuffle events for source pool
+            let shuffled = [...eventsData].sort(() => Math.random() - 0.5);
+            gameState.sourcePool = shuffled;
+            gameState.slots = Array(15).fill(null);
+            renderUI();
+        }
+
+        function renderUI() {
+            // Render Source Pool
+            const poolEl = document.getElementById('sourcePool');
+            poolEl.innerHTML = '';
+            
+            if (gameState.sourcePool.length === 0) {
+                poolEl.innerHTML = `<div class="flex items-center justify-center h-full text-slate-500 text-sm">Semua kad telah diletakkan ke kotak turutan.</div>`;
+            } else {
+                gameState.sourcePool.forEach((item, index) => {
+                    const card = document.createElement('div');
+                    card.className = "bg-slate-700/80 hover:bg-slate-700 border border-slate-600 p-3 rounded-xl cursor-grab card-drag text-sm font-medium flex items-center justify-between shadow";
+                    card.draggable = true;
+                    card.dataset.id = item.id;
+                    card.innerHTML = `
+                        <span class="line-clamp-2">${item.text}</span>
+                        <span class="text-xs bg-slate-800 text-emerald-400 px-2 py-1 rounded ml-2 shrink-0">#${item.id + 1}</span>
+                    `;
+                    
+                    // Mouse Drag Events
+                    card.addEventListener('dragstart', (e) => {
+                        e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'pool', id: item.id }));
+                    });
+
+                    poolEl.appendChild(card);
+                });
+            }
+
+            // Render Timeline Slots
+            const slotsEl = document.getElementById('timelineSlots');
+            slotsEl.innerHTML = '';
+
+            let placedCount = 0;
+            gameState.slots.forEach((item, slotIndex) => {
+                const slot = document.createElement('div');
+                slot.className = "border-2 border-dashed border-slate-600 bg-slate-900/50 rounded-xl p-2.5 flex items-center justify-between min-h-[52px] transition";
+                slot.dataset.slotIndex = slotIndex;
+
+                if (item) {
+                    placedCount++;
+                    slot.className = "border-solid border-emerald-500/60 bg-slate-700/90 rounded-xl p-2.5 flex items-center justify-between min-h-[52px] shadow";
+                    slot.innerHTML = `
+                        <div class="flex items-center space-x-2 overflow-hidden">
+                            <span class="bg-emerald-500 text-slate-950 font-bold px-2 py-0.5 rounded text-xs shrink-0">${slotIndex + 1}</span>
+                            <span class="text-xs truncate text-slate-100">${item.text}</span>
+                        </div>
+                        <button onclick="removeFromSlot(${slotIndex})" class="text-rose-400 hover:text-rose-300 text-xs px-2 py-1 shrink-0">Buang</button>
+                    `;
+                } else {
+                    slot.innerHTML = `
+                        <div class="flex items-center space-x-2 text-slate-500 text-xs">
+                            <span class="bg-slate-800 text-slate-400 font-bold px-2 py-0.5 rounded">${slotIndex + 1}</span>
+                            <span>Letak peristiwa ke-${slotIndex + 1} di sini</span>
+                        </div>
+                    `;
+                }
+
+                // Drop listener
+                slot.addEventListener('dragover', (e) => e.preventDefault());
+                slot.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+                    handleCardPlacement(data.id, slotIndex);
+                });
+
+                slotsEl.appendChild(slot);
+            });
+
+            document.getElementById('progressTextinnerText') || (document.getElementById('progressText').innerText = `${placedCount} / 15 Disusun`);
+        }
+
+        function handleCardPlacement(cardId, slotIndex) {
+            // Find card in pool
+            const poolIndex = gameState.sourcePool.findIndex(c => c.id === cardId);
+            if (poolIndex === -1) return;
+
+            const cardObj = gameState.sourcePool[poolIndex];
+
+            // If slot already occupied, return old item to pool
+            if (gameState.slots[slotIndex] !== null) {
+                gameState.sourcePool.push(gameState.slots[slotIndex]);
+            }
+
+            // Remove from pool and assign to slot
+            gameState.sourcePool.splice(poolIndex, 1);
+            gameState.slots[slotIndex] = cardObj;
+
+            playSound('snap');
+            renderUI();
+        }
+
+        function removeFromSlot(slotIndex) {
+            const item = gameState.slots[slotIndex];
+            if (item) {
+                gameState.sourcePool.push(item);
+                gameState.slots[slotIndex] = null;
+                playSound('snap');
+                renderUI();
+            }
+        }
+
+        function checkAnswers() {
+            let correctCount = 0;
+            let totalFilled = 0;
+
+            gameState.slots.forEach((item, index) => {
+                if (item !== null) {
+                    totalFilled++;
+                    if (item.id === index) {
+                        correctCount++;
+                    }
+                }
+            });
+
+            document.getElementById('scoreVal').innerText = correctCount;
+
+            const modal = document.getElementById('modalOverlay');
+            const modalIcon = document.getElementById('modalIcon');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalDesc = document.getElementById('modalDesc');
+
+            modal.classList.remove('hidden');
+
+            if (correctCount === 15 && totalFilled === 15) {
+                modalIcon.innerText = "🏆";
+                modalTitle.innerText = "Tahniah! Cemerlang!";
+                modalDesc.innerText = "Semua 15 peristiwa sirah Nabi Muhammad SAW disusun dengan susunan kronologi yang sangat tepat!";
+                playSound('success');
+            } else {
+                modalIcon.innerText = "📊";
+                modalTitle.innerText = "Keputusan Semakan";
+                modalDesc.innerText = `Anda mendapat ${correctCount} daripada 15 jawapan yang tepat pada kedudukannya. Teruskan usaha!`;
+                playSound(correctCount > 5 ? 'success' : 'error');
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('modalOverlay').classList.add('hidden');
+        }
+
+        function resetGame() {
+            initGame();
+        }
+
+        function toggleCamView() {
+            const video = document.getElementById('webcam');
+            if (video.style.display === 'none') {
+                video.style.display = 'block';
+                document.getElementById('camToggleBtn').innerText = "Tutup Kamera";
+            } else {
+                video.style.display = 'none';
+                document.getElementById('camToggleBtn').innerText = "Buka Kamera";
+            }
+        }
+
+        let videoElement = document.getElementById('webcam');
+        let canvasElement = document.getElementById('output_canvas');
+        let canvasCtx = canvasElement.getContext('2d');
+        let cursor = document.getElementById('cursor');
+
+        let isPinching = false;
+        let pinchedCardId = null;
+
+        function onResults(results) {
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const landmarks = results.multiHandLandmarks[0];
+                
+                // Index finger tip (landmark 8) & Thumb tip (landmark 4)
+                const indexTip = landmarks[8];
+                const thumbTip = landmarks[4];
+
+                const x = (1 - indexTip.x) * window.innerWidth;
+                const y = indexTip.y * window.innerHeight;
+
+                cursor.style.left = `${x}px`;
+                cursor.style.top = `${y}px`;
+
+                // Calculate distance for pinch gesture
+                const distance = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
+                
+                if (distance < 0.05) {
+                    if (!isPinching) {
+                        isPinching = true;
+                        cursor.classList.add('scale-75', 'bg-emerald-500');
+                        document.getElementById('cursorInner').classList.add('bg-white');
+                        
+                        // Detect element under cursor for gesture selection
+                        const elem = document.elementFromPoint(x, y);
+                        if (elem) {
+                            const cardEl = elem.closest('.card-drag');
+                            if (cardEl && cardEl.dataset.id) {
+                                pincheCard(parseInt(cardEl.dataset.id));
+                            }
+                        }
+                    }
+                } else {
+                    if (isPinching) {
+                        isPinching = false;
+                        cursor.classList.remove('scale-75', 'bg-emerald-500');
+                        document.getElementById('cursorInner').classList.remove('bg-white');
+
+                        // Check if released over a slot
+                        const elem = document.elementFromPoint(x, y);
+                        if (elem) {
+                            const slotEl = elem.closest('[data-slot-index]');
+                            if (slotEl && pinchedCardId !== null) {
+                                handleCardPlacement(pinchedCardId, parseInt(slotEl.dataset.slotIndex));
+                                pinchedCardId = null;
+                            }
+                        }
+                    }
+                }
+            }
+            canvasCtx.restore();
+        }
+
+        function pincheCard(id) {
+            pinchedCardId = id;
+            playSound('snap');
+        }
+
+        const hands = new Hands({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+        });
+
+        hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.6,
+            minTrackingConfidence: 0.6
+        });
+
+        hands.onResults(onResults);
+
+        const camera = new Camera(videoElement, {
+            onFrame: async () => {
+                canvasElement.width = videoElement.videoWidth || 640;
+                canvasElement.height = videoElement.videoHeight || 480;
+                await hands.send({ image: videoElement });
+            },
+            width: 640,
+            height: 480
+        });
+
+        window.onload = function() {
+            initGame();
+            camera.start().catch(err => {
+                console.warn("Kamera tidak dapat diakses atau dibenarkan:", err);
+                document.getElementById('camStatus').innerText = "Mod Tetikus & Sentuhan Diaktifkan (Kamera tidak tersedia)";
+            });
+        };
+    </script>
+</body>
+</html>
